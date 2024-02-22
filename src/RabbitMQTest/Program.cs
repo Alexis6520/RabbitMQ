@@ -1,4 +1,6 @@
 ﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
+using System.Collections.Concurrent;
 using System.Text;
 
 //ESTA DEMO FUNCIONA CON RabbitMQ.Client 6.8.1
@@ -82,7 +84,59 @@ var connFactory = new ConnectionFactory
 //connection.Close();
 //Console.ReadLine();
 
-//----------------- CONFIRMACIÓN DE PUBLICACIONES-----------------
+//----------------- CONFIRMACIÓN ASINCRONA DE PUBLICACIONES-----------------
+//using var connection = connFactory.CreateConnection();
+//using var channel = connection.CreateModel();
+//channel.ConfirmSelect(); // Habilita la confirmación de publicaciones para este canal
+//var exchangeName = "topic_logs";
+//channel.ExchangeDeclare(exchangeName, ExchangeType.Topic); // Crea el propagador de tipo Fanout(A todas las colas conocidas)
+//var message = "Hola guapo";
+//var body = Encoding.UTF8.GetBytes(message);
+//var props = channel.CreateBasicProperties();
+//props.Persistent = true; // Indica al Servidor que tiene que guardar el mensaje en disco
+//var topic = "a.orange.clockwork"; // *-Una palabra cualquiera,#-Una o más palabras
+//var outstandingConfirms = new ConcurrentDictionary<ulong, int>(); // Alamacena los mensajes pendientes
+
+//channel.BasicAcks += (sender, ea) => CleanOutstandingConfirms(ea.DeliveryTag, ea.Multiple); // Agrega un metodo al evento de confirmación
+
+//// Agrega un método al evento de error
+//channel.BasicNacks += (sender, ea) =>
+//{
+//    outstandingConfirms.TryGetValue(ea.DeliveryTag, out int body);
+//    Console.WriteLine($"Message with body {body} has been nack-ed. Sequence number: {ea.DeliveryTag}, multiple: {ea.Multiple}");
+//    CleanOutstandingConfirms(ea.DeliveryTag, ea.Multiple);
+//};
+
+//// Manda un lote de mensajes
+//for (int i = 0; i < 10; i++)
+//{
+//    outstandingConfirms.TryAdd(channel.NextPublishSeqNo, i);
+//    channel.BasicPublish(exchangeName, topic, props, body);
+//}
+
+
+//void CleanOutstandingConfirms(ulong sequenceNumber, bool multiple)
+//{
+//    if (multiple)
+//    {
+//        var confirmed = outstandingConfirms.Where(x => x.Key <= sequenceNumber);
+
+//        foreach (var entry in confirmed)
+//        {
+//            outstandingConfirms.TryRemove(entry.Key, out _);
+//        }
+//    }
+//    else
+//    {
+//        outstandingConfirms.TryRemove(sequenceNumber, out _);
+//    }
+//}
+
+//channel.Close();
+//connection.Close();
+//Console.ReadLine();
+
+//----------------- CONFIRMACIÓN ASINCRONA DE UN LOTE PUBLICACIONES-----------------
 using var connection = connFactory.CreateConnection();
 using var channel = connection.CreateModel();
 channel.ConfirmSelect(); // Habilita la confirmación de publicaciones para este canal
@@ -100,14 +154,13 @@ for (int i = 0; i < 10; i++)
     channel.BasicPublish(exchangeName, topic, props, body);
 }
 
-// Espera a que el servidor confirme de recibido
 try
 {
-    channel.WaitForConfirmsOrDie();
+    channel.WaitForConfirmsOrDie(); // Espera a que se hayan confirmado todos los mensajes
 }
-catch (Exception)
+catch (OperationInterruptedException)
 {
-    // Maneja el error
+    // Maneja en caso de recibir nack
 }
 
 channel.Close();
