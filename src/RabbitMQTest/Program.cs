@@ -163,6 +163,6 @@ catch (OperationInterruptedException)
     // Maneja en caso de recibir nack
 }
 
+Console.ReadLine();
 channel.Close();
 connection.Close();
-Console.ReadLine();
